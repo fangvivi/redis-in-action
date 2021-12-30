@@ -152,7 +152,7 @@ public class Chapter01 {
     }
 
     /**
-     * 按照指定的顺序获取分组的文章<br/>
+     * 根据评分或者发布时间对群组文章进行分页和排序，把一个群组里所有的文章有序地存储到一个有序集合里面<br/>
      * 如果查询的结果不存在，就先创建一个相应的zset作为缓存，60秒后过期，创建完之后再进行查询<br/>
      * 使用【score:】或者【time:】和【group:groupId】取交集，可以得到有序的组元素<br/>
      *【group:groupId】本身是个set，是无序的
@@ -169,7 +169,7 @@ public class Chapter01 {
         if(!conn.exists(key)){
             // 取交集，选择score值比较大的元素
             ZParams param = new ZParams().aggregate(ZParams.Aggregate.MAX);
-            // 缓存，减小请求的压力
+            // 生成缓存，等到一个按照评分或者时间排序的群组文章，减小计算的压力
             conn.zinterstore(key, param, "group:"+ groupId, orderSetKey);
             // 缓存60秒之后删除
             conn.expire(key, 60L);

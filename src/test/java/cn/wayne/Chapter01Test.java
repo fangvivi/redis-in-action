@@ -21,7 +21,8 @@ class Chapter01Test {
      */
     @BeforeAll
     static void getRedisConnection() {
-        String redisHost = "192.168.40.128";
+        // String redisHost = "192.168.40.128";
+        String redisHost = "192.168.198.129";
         int port = 6379;
         try {
             jedis = new Jedis(redisHost, port);

@@ -206,7 +206,8 @@ public class Chapter01 {
     }
 
     public void run(){
-        String redisHost = "192.168.40.128";
+        // String redisHost = "192.168.40.128";
+        String redisHost = "192.168.198.129";
         int port = 6379;
         Jedis jedis = new Jedis(redisHost, port);
         String user = "username";

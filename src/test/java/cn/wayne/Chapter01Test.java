@@ -56,7 +56,7 @@ class Chapter01Test {
         Map<String, String> articleById = chapter01.getArticleById(jedis, id);
         assertNotNull(articleById);
         for (Map.Entry<String, String> entry : articleById.entrySet()) {
-            log.info("【article:{}】 {}:{}", id, entry.getKey(), entry.getValue());
+            log.info("【article:"+id+"】 {}:{}", entry.getKey(), entry.getValue());
         }
     }
 
@@ -67,18 +67,7 @@ class Chapter01Test {
     @Test
     void articleVote() {
         Chapter01 chapter01 = new Chapter01();
-        chapter01.articleVote(jedis,"hello","article:1");
-
-    }
-
-    /**
-     * 投反对票
-     */
-    @Test
-    void articleAntiVote() {
-        Chapter01 chapter01 = new Chapter01();
-        chapter01.articleAntiVote(jedis,"world","article:1");
-        chapter01.printArticle(jedis, "article:1");
+        chapter01.articleVote(jedis,"lisi","article:1");
     }
 
     /**

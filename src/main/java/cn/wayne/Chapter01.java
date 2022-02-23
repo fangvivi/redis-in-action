@@ -22,25 +22,17 @@ public class Chapter01 {
 
 
     /**
-     * 为文章增加1票<br/>
-     * zset【time:】获取文章的score，判断是否可以继续投票<br/>
-     * 投票成功<br/>
-     * zset【score:】文章的score增加1票对应的分数分数<br/>
-     * hash【article:articleId】的field【votes】对应的value增加1票
+     * 为文章增加1票，如果文章过期，不可以投票</br>
+     * 投票成功的话，文章增加1票对应的分数分数，文章hash中的【votes】增加1票
      * @param conn redis连接
      * @param user 投票的用户id
-     * @param article 被投票的文章
+     * @param article 文章的id
      */
     public void articleVote(Jedis conn, String user, String article){
-        // 一周前的时间点
-        long cutoff = (System.currentTimeMillis() / 1000)- ONE_WEEK_IN_SECONDS;
-        // 文章发表已经超过一周，无法继续投票
-        if(conn.zscore("time:",article) < cutoff){
-            return;
-        }
+        isOutDated(conn, article);
         // 文章的名称格式【article:100408】，冒号后面是文章的id
         String articleId = article.substring(article.indexOf(":") + 1);
-        // 投票成功
+        // 一个用户只能投一次票
         if(conn.sadd("voted:" + articleId, user) == 1){
             // 文章的评分增加
             conn.zincrby("score:",VOTE_SCORE, article);
@@ -48,6 +40,36 @@ public class Chapter01 {
             conn.hincrBy("article:"+articleId,"votes",1);
         }
         log.info("用户【{}】为文章【{}】投了一票",user, article);
+    }
+
+    /**
+     * 对文章投反对票
+     * @param conn redis连接
+     * @param user 投票的用户id
+     * @param article 文章的id
+     */
+    public void articleAntiVote(Jedis conn, String user, String article){
+        isOutDated(conn, article);
+        // 文章的名称格式【article:100408】，冒号后面是文章的id
+        String articleId = article.substring(article.indexOf(":") + 1);
+        // 一个用户只能投一次票
+        if(conn.sadd("anti-voted:" + articleId, user) == 1){
+            // 文章的评分减少
+            conn.zincrby("score:",-VOTE_SCORE, article);
+            // 文章的反对票增加
+            conn.hincrBy("article:"+articleId,"anti-votes",1);
+        }
+        log.info("用户【{}】为文章【{}】投了反对票",user, article);
+    }
+
+    private void isOutDated(Jedis conn, String article){
+        // 一周前的时间点
+        long cutoff = (System.currentTimeMillis() / 1000)- ONE_WEEK_IN_SECONDS;
+        // 文章发表已经超过一周，无法继续投票
+        if(conn.zscore("time:",article) < cutoff){
+            log.info("文章【{}】已经过期，无法继续投票",article);
+            return;
+        }
     }
 
     /**
@@ -82,6 +104,7 @@ public class Chapter01 {
         articleMap.put("time",String.valueOf(now));
         articleMap.put("votes","1");
         conn.hset(article,articleMap);
+        // 保存文章发表的时间
         conn.zadd("time:", now, article);
         // 新文章默认有一票
         conn.zadd("score:",now+VOTE_SCORE, article);
@@ -169,7 +192,7 @@ public class Chapter01 {
         if(!conn.exists(key)){
             // 取交集，选择score值比较大的元素
             ZParams param = new ZParams().aggregate(ZParams.Aggregate.MAX);
-            // 生成缓存，等到一个按照评分或者时间排序的群组文章，减小计算的压力
+            // 生成缓存，保存一个按照评分或者时间排序的群组文章，减小计算的压力
             conn.zinterstore(key, param, "group:"+ groupId, orderSetKey);
             // 缓存60秒之后删除
             conn.expire(key, 60L);
@@ -205,8 +228,27 @@ public class Chapter01 {
         }
     }
 
+    /**
+     * 输出查询出的文章信息（hash）
+     * @param article 文章
+     * @param conn jedis
+     */
+    public void printArticle(Jedis conn, String article){
+        // 文章的名称格式【article:100408】，冒号后面是文章的id
+        String articleId = article.substring(article.indexOf(":") + 1);
+        Map<String, String> articleHash = getArticleById(conn, articleId);
+        Set<Map.Entry<String, String>> entries = articleHash.entrySet();
+        for (Map.Entry<String, String> entry : entries) {
+            if("id".equals(entry.getKey())){
+                continue;
+            }
+            log.info("【article:{}】--{}:{}", articleId, entry.getKey(), entry.getValue());
+        }
+    }
+
     public void run(){
-        String redisHost = "192.168.40.128";
+        // String redisHost = "192.168.40.128";
+        String redisHost = "192.168.40.110";
         int port = 6379;
         Jedis jedis = new Jedis(redisHost, port);
         String user = "username";

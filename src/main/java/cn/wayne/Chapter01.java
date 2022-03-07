@@ -14,7 +14,7 @@ import java.util.*;
 public class Chapter01 {
 
     /** 一周的秒数 */
-    private static final long ONE_WEEK_IN_SECONDS = 7 * 86400;
+    private static final long ONE_WEEK_IN_SECONDS = 7 * 86400L;
     /** 每票对应的评分 */
     private static final int VOTE_SCORE = 432;
     /** 每页的文章数量 */
@@ -22,14 +22,16 @@ public class Chapter01 {
 
 
     /**
-     * 为文章增加1票，如果文章过期，不可以投票</br>
-     * 投票成功的话，文章增加1票对应的分数分数，文章hash中的【votes】增加1票
+     * 为文章增加1票，不可以对过期的文章投票，
+     * 投票成功的话，文章增加1票对应的分数，文章hash中的【votes】增加1票
      * @param conn redis连接
      * @param user 投票的用户id
      * @param article 文章的id
      */
     public void articleVote(Jedis conn, String user, String article){
-        isOutDated(conn, article);
+        if(isOutDated(conn, article)){
+            return;
+        }
         // 文章的名称格式【article:100408】，冒号后面是文章的id
         String articleId = article.substring(article.indexOf(":") + 1);
         // 一个用户只能投一次票
@@ -43,13 +45,16 @@ public class Chapter01 {
     }
 
     /**
-     * 对文章投反对票
+     * 对文章投反对票，不可以对过期的文章投票，
+     * 投票成功的话，文章减少1票对应的分数，文章hash中的【anti-votes】增加1票
      * @param conn redis连接
      * @param user 投票的用户id
      * @param article 文章的id
      */
     public void articleAntiVote(Jedis conn, String user, String article){
-        isOutDated(conn, article);
+        if(isOutDated(conn, article)){
+            return;
+        }
         // 文章的名称格式【article:100408】，冒号后面是文章的id
         String articleId = article.substring(article.indexOf(":") + 1);
         // 一个用户只能投一次票
@@ -62,14 +67,20 @@ public class Chapter01 {
         log.info("用户【{}】为文章【{}】投了反对票",user, article);
     }
 
-    private void isOutDated(Jedis conn, String article){
+    /**
+     * 判断文章是否过期，不可以对过期的文章投票
+     * @param conn jedis
+     * @param article 文章
+     */
+    private boolean isOutDated(Jedis conn, String article){
         // 一周前的时间点
         long cutoff = (System.currentTimeMillis() / 1000)- ONE_WEEK_IN_SECONDS;
         // 文章发表已经超过一周，无法继续投票
         if(conn.zscore("time:",article) < cutoff){
             log.info("文章【{}】已经过期，无法继续投票",article);
-            return;
+            return true;
         }
+        return false;
     }
 
     /**
@@ -189,7 +200,7 @@ public class Chapter01 {
         // 缓存的key
         String key = orderSetKey + groupId;
         log.info("缓存的key为【{}】",key);
-        if(!conn.exists(key)){
+        if(Boolean.FALSE.equals(conn.exists(key))){
             // 取交集，选择score值比较大的元素
             ZParams param = new ZParams().aggregate(ZParams.Aggregate.MAX);
             // 生成缓存，保存一个按照评分或者时间排序的群组文章，减小计算的压力
@@ -205,7 +216,7 @@ public class Chapter01 {
      * @param conn redis连接
      * @param groupId 分组id
      * @param page 页数
-     * @return
+     * @return 分组文章
      */
     public List<Map<String, String>> getGroupArticles(Jedis conn, String groupId, int page){
         return getGroupArticles(conn,groupId,page,"score:");
@@ -271,13 +282,13 @@ public class Chapter01 {
         log.info("The currently highest-scoring articles are:");
         List<Map<String, String>> articles = getArticlesByScore(jedis, 1);
         printArticles(articles);
-        assert articles.size() >=1;
+        assert !articles.isEmpty();
 
         addGroups(jedis,articleId, new String[]{"new-group"});
         log.info("We added the article to a new group, other articles include:");
         articles = getGroupArticles(jedis, "new-group", 1);
         printArticles(articles);
-        assert articles.size() >=1;
+        assert !articles.isEmpty();
 
     }
 
